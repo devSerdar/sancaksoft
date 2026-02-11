@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { BarChart3 } from "lucide-react";
 
 type Period = "day" | "week" | "month";
 
-export default function CustomerLedgerPage() {
+function CustomerLedgerContent() {
     const searchParams = useSearchParams();
     const initialCustomerId = searchParams.get("customer_id") || "";
 
@@ -236,5 +236,19 @@ export default function CustomerLedgerPage() {
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+export default function CustomerLedgerPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-4 sm:p-8">
+                <div className="flex items-center justify-center h-48">
+                    <span className="text-gray-500">Yükleniyor...</span>
+                </div>
+            </div>
+        }>
+            <CustomerLedgerContent />
+        </Suspense>
     );
 }
