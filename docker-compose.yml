@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  sancaksoft-db:
+    image: postgres:16-alpine
+    container_name: sancaksoft-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: sancaksoft
+    volumes:
+      - ./database.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: always
+
+# Use 'docker-compose up -d' to start this database.
+# The init.sql file will be executed automatically on first run.

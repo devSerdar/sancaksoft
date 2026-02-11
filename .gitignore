@@ -1,0 +1,23 @@
+# Environment
+.env
+.env.*
+
+# Go build output
+bin/
+*.exe
+
+# Frontend (Next.js)
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/build
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
