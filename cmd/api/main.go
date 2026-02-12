@@ -79,9 +79,19 @@ func main() {
 	app := fiber.New()
 
 	// Middlewares
-	// CORS - Allow Frontend to access Backend
+	// CORS - Allow Frontend to access Backend (local + production)
 	app.Use(func(c *fiber.Ctx) error {
-		c.Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		origin := c.Get("Origin")
+		allowed := map[string]bool{
+			"http://localhost:3000":    true,
+			"http://213.142.151.235":   true,
+			"https://213.142.151.235":  true,
+		}
+		if allowed[origin] {
+			c.Set("Access-Control-Allow-Origin", origin)
+		} else {
+			c.Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		}
 		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Set("Access-Control-Allow-Headers", "Content-Type, X-Tenant-ID, X-User-ID")
 		if c.Method() == "OPTIONS" {
@@ -93,11 +103,14 @@ func main() {
 	app.Use(recover.New()) // Panic Recovery
 
 	// 5. Routes
+	// /api/v1/... (normal path) - Nginx bazen /api'yi kesiyor, /v1/... da kabul et
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
+	v1Direct := app.Group("/v1") // Nginx proxy /api'yi sildiğinde /v1/... gelir
 
 	// Tenant & Auth Middleware applied to sensitive routes
 	protected := v1.Group("/", middleware.TenantMiddleware(), middleware.AuthMiddleware())
+	protectedDirect := v1Direct.Group("/", middleware.TenantMiddleware(), middleware.AuthMiddleware())
 
 	// Invoice Routes
 	protected.Post("/invoices", invoiceHandler.CreateInvoice)
@@ -131,6 +144,27 @@ func main() {
 
 	// Dashboard Routes
 	protected.Get("/dashboard/stats", dashboardHandler.GetStats)
+
+	// Aynı route'lar /v1/... altında (Nginx /api keserse)
+	protectedDirect.Post("/invoices", invoiceHandler.CreateInvoice)
+	protectedDirect.Get("/invoices", invoiceHandler.ListInvoices)
+	protectedDirect.Get("/invoices/:id", invoiceHandler.GetInvoiceDetail)
+	protectedDirect.Post("/products", productHandler.CreateProduct)
+	protectedDirect.Get("/products", productHandler.ListProducts)
+	protectedDirect.Post("/customers", customerHandler.CreateCustomer)
+	protectedDirect.Get("/customers", customerHandler.ListCustomers)
+	protectedDirect.Get("/customers/:customerId/ledger", customerHandler.GetCustomerLedger)
+	protectedDirect.Post("/warehouses", warehouseHandler.CreateWarehouse)
+	protectedDirect.Get("/warehouses", warehouseHandler.ListWarehouses)
+	protectedDirect.Get("/stock-movements", stockHandler.ListStockMovements)
+	protectedDirect.Post("/stock-movements", stockHandler.CreateStockMovement)
+	protectedDirect.Get("/stock-balance", stockHandler.GetStockBalance)
+	protectedDirect.Get("/stock-balance-total", stockHandler.GetTotalStockBalance)
+	protectedDirect.Get("/stock-balance-by-warehouse", stockHandler.GetStockBalanceByWarehouse)
+	protectedDirect.Post("/returns", returnHandler.CreateCustomerReturn)
+	protectedDirect.Get("/returns", returnHandler.ListCustomerReturns)
+	protectedDirect.Get("/returns/customer-purchases/:customerId", returnHandler.ListCustomerPurchases)
+	protectedDirect.Get("/dashboard/stats", dashboardHandler.GetStats)
 
 	// Health Check
 	app.Get("/health", func(c *fiber.Ctx) error {

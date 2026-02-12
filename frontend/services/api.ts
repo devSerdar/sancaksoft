@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api/v1', // Go Backend URL
+ baseURL: "/api/v1",
   headers: {
     'Content-Type': 'application/json',
     // Stub Tenant ID for MVP (In real app, this comes from Auth/Login)
