@@ -249,21 +249,24 @@ export default function ProductsPage() {
                                                 <div className="text-gray-400 text-xs">KDV dahil: ₺{(parseFloat(p.price) * (1 + parseFloat(p.vat_rate) / 100)).toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
-                                            <button
-                                                type="button"
-                                                data-stock-trigger
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                                    const x = Math.max(12, Math.min(rect.left, window.innerWidth - 232));
-                                                    setStockPopover(stockPopover?.productId === p.id ? null : { productId: p.id, x, y: rect.bottom + 6 });
-                                                }}
-                                                className={`inline-flex items-center gap-1 text-sm font-medium px-2 py-1 rounded ${(p.totalStock ?? 0) === 0 ? "text-red-600 bg-red-50" : (p.totalStock ?? 0) < 10 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50"}`}
-                                            >
-                                                {loadingStocks[p.id] ? "..." : `${p.totalStock ?? 0} ${p.unit}`}
-                                                {(p.warehouseStocks?.filter((w) => w.quantity > 0).length ?? 0) > 0 && <Info className="h-3 w-3 shrink-0" />}
-                                            </button>
+                                        <div className="pt-2 border-t border-gray-100 space-y-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Stok</span>
+                                                <button
+                                                    type="button"
+                                                    data-stock-trigger
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                        const x = Math.max(12, Math.min(rect.left, window.innerWidth - 232));
+                                                        setStockPopover(stockPopover?.productId === p.id ? null : { productId: p.id, x, y: rect.bottom + 6 });
+                                                    }}
+                                                    className={`inline-flex items-center gap-1 text-sm font-semibold px-2 py-1 rounded tabular-nums min-w-[72px] justify-end ${(p.totalStock ?? 0) === 0 ? "text-red-600 bg-red-50" : (p.totalStock ?? 0) < 10 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50"}`}
+                                                >
+                                                    {loadingStocks[p.id] ? "..." : `${p.totalStock ?? 0} ${p.unit}`}
+                                                    {(p.warehouseStocks?.filter((w) => w.quantity > 0).length ?? 0) > 0 && <Info className="h-3 w-3 shrink-0" />}
+                                                </button>
+                                            </div>
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={() => { setShowStockForm(p.id); setStockMode("add"); }}
@@ -305,9 +308,9 @@ export default function ProductsPage() {
                                                 <td className="py-3.5 px-4 text-gray-500 text-sm">{p.unit}</td>
                                                 <td className="py-3.5 px-4 text-right text-sm font-medium">₺{parseFloat(p.price).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                 <td className="py-3.5 px-4 text-right text-sm font-medium">₺{(parseFloat(p.price) * (1 + parseFloat(p.vat_rate) / 100)).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                                <td className="py-3.5 px-4">
+                                                <td className="py-3.5 px-4 text-right">
                                                     {loadingStocks[p.id] ? (
-                                                        <span className="text-gray-400 text-sm">...</span>
+                                                        <span className="text-gray-400 text-sm tabular-nums">...</span>
                                                     ) : (
                                                         <button
                                                             type="button"
@@ -318,10 +321,10 @@ export default function ProductsPage() {
                                                                 const x = Math.max(12, Math.min(rect.left, window.innerWidth - 232));
                                                                 setStockPopover(stockPopover?.productId === p.id ? null : { productId: p.id, x, y: rect.bottom + 6 });
                                                             }}
-                                                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-100 text-sm font-medium ${(p.totalStock ?? 0) === 0 ? "text-red-600" : (p.totalStock ?? 0) < 10 ? "text-amber-600" : "text-emerald-600"}`}
+                                                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-100 text-sm font-medium tabular-nums justify-end min-w-[80px] ${(p.totalStock ?? 0) === 0 ? "text-red-600" : (p.totalStock ?? 0) < 10 ? "text-amber-600" : "text-emerald-600"}`}
                                                         >
                                                             <span>{p.totalStock ?? 0} {p.unit}</span>
-                                                            {(p.warehouseStocks?.filter((w) => w.quantity > 0).length ?? 0) > 0 && <Info className="h-3.5 w-3.5 text-gray-400" />}
+                                                            {(p.warehouseStocks?.filter((w) => w.quantity > 0).length ?? 0) > 0 && <Info className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
                                                         </button>
                                                     )}
                                                 </td>
