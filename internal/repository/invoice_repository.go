@@ -148,3 +148,62 @@ func (r *InvoiceRepository) CreateAuditLog(ctx context.Context, tx pgx.Tx, log *
 	)
 	return err
 }
+
+// GetInvoice retrieves an invoice by ID (returns nil if deleted)
+func (r *InvoiceRepository) GetInvoice(ctx context.Context, tx pgx.Tx, tenantID, invoiceID uuid.UUID) (*domain.Invoice, error) {
+	query := `
+		SELECT id, tenant_id, warehouse_id, customer_id, invoice_number, total_amount, created_at, updated_at
+		FROM invoices
+		WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
+	`
+	var inv domain.Invoice
+	err := tx.QueryRow(ctx, query, tenantID, invoiceID).Scan(
+		&inv.ID, &inv.TenantID, &inv.WarehouseID, &inv.CustomerID,
+		&inv.InvoiceNumber, &inv.TotalAmount, &inv.CreatedAt, &inv.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &inv, nil
+}
+
+// ListInvoiceItemsByInvoiceID returns all items for an invoice
+func (r *InvoiceRepository) ListInvoiceItemsByInvoiceID(ctx context.Context, tx pgx.Tx, tenantID, invoiceID uuid.UUID) ([]domain.InvoiceItem, error) {
+	query := `
+		SELECT id, tenant_id, invoice_id, product_id, quantity, unit_price, total, created_at
+		FROM invoice_items
+		WHERE tenant_id = $1 AND invoice_id = $2
+	`
+	rows, err := tx.Query(ctx, query, tenantID, invoiceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list invoice items: %w", err)
+	}
+	defer rows.Close()
+	var items []domain.InvoiceItem
+	for rows.Next() {
+		var item domain.InvoiceItem
+		if err := rows.Scan(
+			&item.ID, &item.TenantID, &item.InvoiceID, &item.ProductID,
+			&item.Quantity, &item.UnitPrice, &item.Total, &item.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan invoice item: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// SoftDeleteInvoice sets deleted_at on an invoice
+func (r *InvoiceRepository) SoftDeleteInvoice(ctx context.Context, tx pgx.Tx, tenantID, invoiceID uuid.UUID) error {
+	result, err := tx.Exec(ctx,
+		`UPDATE invoices SET deleted_at = NOW(), updated_at = NOW() WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+		tenantID, invoiceID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to soft delete invoice: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("invoice not found or already deleted")
+	}
+	return nil
+}

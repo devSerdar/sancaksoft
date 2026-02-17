@@ -120,6 +120,7 @@ func main() {
 	protected.Post("/invoices", invoiceHandler.CreateInvoice)
 	protected.Get("/invoices", invoiceHandler.ListInvoices)
 	protected.Get("/invoices/:id", invoiceHandler.GetInvoiceDetail)
+	protected.Delete("/invoices/:id", invoiceHandler.DeleteInvoice)
 
 	// Product Routes
 	protected.Post("/products", productHandler.CreateProduct)
@@ -144,6 +145,7 @@ func main() {
 	// Return Routes
 	protected.Post("/returns", returnHandler.CreateCustomerReturn)
 	protected.Get("/returns", returnHandler.ListCustomerReturns)
+	protected.Delete("/returns/:id", returnHandler.DeleteReturn)
 	protected.Get("/returns/customer-purchases/:customerId", returnHandler.ListCustomerPurchases)
 
 	// Dashboard Routes
@@ -152,6 +154,8 @@ func main() {
 	// Payment Routes
 	protected.Post("/payments", paymentHandler.CreatePayment)
 	protected.Get("/payments", paymentHandler.ListPayments)
+	protected.Put("/payments/:id", paymentHandler.UpdatePayment)
+	protected.Delete("/payments/:id", paymentHandler.DeletePayment)
 	protected.Get("/customers/:customerId/balance", paymentHandler.GetCustomerBalance)
 	protected.Get("/customers/:customerId/ledger-detail", paymentHandler.GetCustomerLedgerDetail)
 
@@ -159,6 +163,7 @@ func main() {
 	protectedDirect.Post("/invoices", invoiceHandler.CreateInvoice)
 	protectedDirect.Get("/invoices", invoiceHandler.ListInvoices)
 	protectedDirect.Get("/invoices/:id", invoiceHandler.GetInvoiceDetail)
+	protectedDirect.Delete("/invoices/:id", invoiceHandler.DeleteInvoice)
 	protectedDirect.Post("/products", productHandler.CreateProduct)
 	protectedDirect.Get("/products", productHandler.ListProducts)
 	protectedDirect.Post("/customers", customerHandler.CreateCustomer)
@@ -173,10 +178,13 @@ func main() {
 	protectedDirect.Get("/stock-balance-by-warehouse", stockHandler.GetStockBalanceByWarehouse)
 	protectedDirect.Post("/returns", returnHandler.CreateCustomerReturn)
 	protectedDirect.Get("/returns", returnHandler.ListCustomerReturns)
+	protectedDirect.Delete("/returns/:id", returnHandler.DeleteReturn)
 	protectedDirect.Get("/returns/customer-purchases/:customerId", returnHandler.ListCustomerPurchases)
 	protectedDirect.Get("/dashboard/stats", dashboardHandler.GetStats)
 	protectedDirect.Post("/payments", paymentHandler.CreatePayment)
 	protectedDirect.Get("/payments", paymentHandler.ListPayments)
+	protectedDirect.Put("/payments/:id", paymentHandler.UpdatePayment)
+	protectedDirect.Delete("/payments/:id", paymentHandler.DeletePayment)
 	protectedDirect.Get("/customers/:customerId/balance", paymentHandler.GetCustomerBalance)
 	protectedDirect.Get("/customers/:customerId/ledger-detail", paymentHandler.GetCustomerLedgerDetail)
 

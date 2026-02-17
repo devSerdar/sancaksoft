@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import api from "@/services/api";
 import { Customer } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,11 +35,12 @@ export default function CustomersPage() {
         e.preventDefault();
         try {
             await api.post("/customers", formData);
+            toast.success("Müşteri oluşturuldu");
             setShowForm(false);
             setFormData({ name: "", email: "", phone: "", address: "" });
             fetchCustomers();
         } catch (error: any) {
-            alert(`Müşteri oluşturulamadı: ${error.response?.data?.error || error.message}`);
+            toast.error("Müşteri oluşturulamadı", { description: error.response?.data?.error || error.message });
         }
     };
 

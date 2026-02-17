@@ -87,3 +87,34 @@ func (s *ReturnService) ListCustomerPurchaseSummaries(ctx context.Context, tenan
 	defer cancel()
 	return s.repo.ListCustomerPurchaseSummaries(ctx, tenantID, customerID)
 }
+
+// DeleteCustomerReturn removes a return and reverses the stock movement
+func (s *ReturnService) DeleteCustomerReturn(ctx context.Context, tenantID, returnID uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	ret, err := s.repo.GetReturnByID(ctx, tenantID, returnID)
+	if err != nil {
+		return fmt.Errorf("return not found: %w", err)
+	}
+
+	err = WithTransaction(ctx, s.db, func(tx pgx.Tx) error {
+		// Reverse stock: add OUT movement (negative quantity) to undo the IN from the return
+		refType := "RETURN_CANCEL"
+		movement := &domain.StockMovement{
+			ID:            uuid.New(),
+			TenantID:      ret.TenantID,
+			ProductID:     ret.ProductID,
+			WarehouseID:   ret.WarehouseID,
+			Quantity:      -ret.Quantity, // Negative to reverse the IN
+			Type:          domain.StockMovementTypeOut,
+			ReferenceID:   &ret.ID,
+			ReferenceType: &refType,
+		}
+		if err := s.repo.CreateStockMovement(ctx, tx, movement); err != nil {
+			return fmt.Errorf("failed to create reversal stock movement: %w", err)
+		}
+		return s.repo.DeleteCustomerReturn(ctx, tx, tenantID, returnID)
+	})
+	return err
+}

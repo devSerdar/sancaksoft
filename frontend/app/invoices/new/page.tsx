@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from "sonner";
 import api from "@/services/api";
 import { Product, Customer, Warehouse } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,14 +120,14 @@ export default function NewInvoicePage() {
     const onSubmit = async (data: InvoiceFormData) => {
         // Validate that customer and warehouse are selected
         if (!data.customer_id || !data.warehouse_id) {
-            alert("Lütfen hem Müşteri hem de Depo seçin!");
+            toast.warning("Lütfen hem Müşteri hem de Depo seçin");
             return;
         }
 
         // Validate that at least one product is selected
         const validItems = items.filter(item => item.product_id && item.quantity > 0);
         if (validItems.length === 0) {
-            alert("Lütfen en az bir ürün ekleyin!");
+            toast.warning("Lütfen en az bir ürün ekleyin");
             return;
         }
 
@@ -143,7 +144,7 @@ export default function NewInvoicePage() {
                 })),
             };
             await api.post("/invoices", payload);
-            alert("Fatura başarıyla oluşturuldu!");
+            toast.success("Fatura oluşturuldu");
             router.push("/invoices");
         } catch (error: any) {
             console.error("Error details:", error.response?.data);
@@ -158,12 +159,12 @@ export default function NewInvoicePage() {
                     const requested = match[3];
                     const product = products.find(p => p.id === productId);
                     const productName = product ? product.name : productId;
-                    alert(`Insufficient Stock!\n\nProduct: ${productName}\nAvailable: ${available}\nRequested: ${requested}\n\nPlease reduce the quantity or add stock to the warehouse.`);
+                    toast.error("Yetersiz stok", { description: `${productName}: Mevcut ${available}, İstenen ${requested}. Miktarı azaltın veya depoya stok ekleyin.` });
                 } else {
-                    alert(`Fatura oluşturulamadı: ${errorMessage}`);
+                    toast.error("Fatura oluşturulamadı", { description: errorMessage });
                 }
             } else {
-                alert(`Failed to create invoice: ${errorMessage}`);
+                toast.error("Fatura oluşturulamadı", { description: errorMessage });
             }
         } finally {
             setLoading(false);

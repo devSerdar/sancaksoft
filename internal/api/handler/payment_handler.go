@@ -101,6 +101,64 @@ func (h *PaymentHandler) ListPayments(c *fiber.Ctx) error {
 	return c.JSON(respDTOs)
 }
 
+// UpdatePayment handles PUT /payments/:id
+func (h *PaymentHandler) UpdatePayment(c *fiber.Ctx) error {
+	paymentID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid payment id"})
+	}
+	tenantID, _ := c.Locals(middleware.LocalsTenantID).(uuid.UUID)
+
+	var reqDTO dto.UpdatePaymentRequestDTO
+	if err := c.BodyParser(&reqDTO); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body", "details": err.Error()})
+	}
+
+	paymentDate := time.Now()
+	if reqDTO.PaymentDate != nil {
+		paymentDate = *reqDTO.PaymentDate
+	}
+
+	req := &domain.UpdatePaymentRequest{
+		Amount:        reqDTO.Amount,
+		PaymentMethod: domain.PaymentMethod(reqDTO.PaymentMethod),
+		ReferenceNo:   reqDTO.ReferenceNo,
+		Notes:         reqDTO.Notes,
+		PaymentDate:   paymentDate,
+	}
+
+	payment, err := h.service.UpdatePayment(c.Context(), tenantID, paymentID, req)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	respDTO := dto.PaymentResponseDTO{
+		ID:            payment.ID,
+		CustomerID:    payment.CustomerID,
+		Amount:        payment.Amount,
+		PaymentMethod: string(payment.PaymentMethod),
+		ReferenceNo:   payment.ReferenceNo,
+		Notes:         payment.Notes,
+		PaymentDate:   payment.PaymentDate,
+		CreatedAt:     payment.CreatedAt,
+	}
+	return c.JSON(respDTO)
+}
+
+// DeletePayment handles DELETE /payments/:id
+func (h *PaymentHandler) DeletePayment(c *fiber.Ctx) error {
+	paymentID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid payment id"})
+	}
+	tenantID, _ := c.Locals(middleware.LocalsTenantID).(uuid.UUID)
+
+	if err := h.service.DeletePayment(c.Context(), tenantID, paymentID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 // GetCustomerBalance handles GET /customers/:customerId/balance
 func (h *PaymentHandler) GetCustomerBalance(c *fiber.Ctx) error {
 	tenantID, _ := c.Locals(middleware.LocalsTenantID).(uuid.UUID)

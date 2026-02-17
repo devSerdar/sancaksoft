@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Customer, CustomerLedgerEntry } from "@/types";
@@ -53,7 +54,7 @@ function CustomerLedgerContent() {
                 setEntries(res.data);
             } catch (error: any) {
                 setEntries([]);
-                alert(`Cari detay getirilemedi: ${error.response?.data?.error || error.message}`);
+                toast.error("Cari detay getirilemedi", { description: error.response?.data?.error || error.message });
             } finally {
                 setLoadingLedger(false);
             }

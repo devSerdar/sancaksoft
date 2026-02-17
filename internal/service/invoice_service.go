@@ -144,3 +144,39 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, req domain.CreateInv
 
 	return createdInvoice, nil
 }
+
+// DeleteInvoice soft-deletes an invoice and reverses stock movements
+func (s *InvoiceService) DeleteInvoice(ctx context.Context, tenantID, invoiceID uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	err := WithTransaction(ctx, s.db, func(tx pgx.Tx) error {
+		inv, err := s.repo.GetInvoice(ctx, tx, tenantID, invoiceID)
+		if err != nil {
+			return fmt.Errorf("invoice not found: %w", err)
+		}
+		items, err := s.repo.ListInvoiceItemsByInvoiceID(ctx, tx, tenantID, invoiceID)
+		if err != nil {
+			return err
+		}
+		for _, item := range items {
+			// Reverse stock: invoice had -quantity (SALE), add +quantity to put stock back
+			refType := "INVOICE_CANCEL"
+			movement := &domain.StockMovement{
+				ID:            uuid.New(),
+				TenantID:      inv.TenantID,
+				ProductID:     item.ProductID,
+				WarehouseID:   inv.WarehouseID,
+				Quantity:      item.Quantity, // Positive to reverse the sale
+				Type:          domain.StockMovementTypeIn,
+				ReferenceID:   &invoiceID,
+				ReferenceType: &refType,
+			}
+			if err := s.repo.CreateStockMovement(ctx, tx, movement); err != nil {
+				return fmt.Errorf("failed to create reversal stock movement: %w", err)
+			}
+		}
+		return s.repo.SoftDeleteInvoice(ctx, tx, tenantID, invoiceID)
+	})
+	return err
+}

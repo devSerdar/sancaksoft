@@ -135,3 +135,17 @@ func (h *InvoiceHandler) GetInvoiceDetail(c *fiber.Ctx) error {
 
 	return c.JSON(resp)
 }
+
+// DeleteInvoice handles DELETE /invoices/:id
+func (h *InvoiceHandler) DeleteInvoice(c *fiber.Ctx) error {
+	invoiceID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid invoice id"})
+	}
+	tenantID, _ := c.Locals(middleware.LocalsTenantID).(uuid.UUID)
+
+	if err := h.service.DeleteInvoice(c.Context(), tenantID, invoiceID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}

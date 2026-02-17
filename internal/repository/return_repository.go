@@ -105,6 +105,39 @@ func (r *ReturnRepository) CreateStockMovement(ctx context.Context, tx pgx.Tx, m
 	return err
 }
 
+// GetReturnByID retrieves a return by ID (for delete validation and stock reversal)
+func (r *ReturnRepository) GetReturnByID(ctx context.Context, tenantID, returnID uuid.UUID) (*domain.CustomerReturn, error) {
+	query := `
+		SELECT id, tenant_id, customer_id, product_id, warehouse_id, quantity, unit_price, total, reason, created_at
+		FROM customer_returns
+		WHERE tenant_id = $1 AND id = $2
+	`
+	var ret domain.CustomerReturn
+	err := r.db.QueryRow(ctx, query, tenantID, returnID).Scan(
+		&ret.ID, &ret.TenantID, &ret.CustomerID, &ret.ProductID, &ret.WarehouseID,
+		&ret.Quantity, &ret.UnitPrice, &ret.Total, &ret.Reason, &ret.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+// DeleteCustomerReturn removes a return (caller must handle stock reversal in same tx)
+func (r *ReturnRepository) DeleteCustomerReturn(ctx context.Context, tx pgx.Tx, tenantID, returnID uuid.UUID) error {
+	result, err := tx.Exec(ctx,
+		`DELETE FROM customer_returns WHERE tenant_id = $1 AND id = $2`,
+		tenantID, returnID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete return: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("return not found")
+	}
+	return nil
+}
+
 func (r *ReturnRepository) ListCustomerReturns(ctx context.Context, tenantID uuid.UUID) ([]domain.CustomerReturn, error) {
 	if err := r.ensureCustomerReturnsTable(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ensure returns table: %w", err)

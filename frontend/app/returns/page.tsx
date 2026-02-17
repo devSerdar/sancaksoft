@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/Pagination";
@@ -99,7 +100,7 @@ export default function ReturnsPage() {
         } catch (error) {
             console.error("Failed to fetch customer purchases", error);
             const message = (error as any)?.response?.data?.error || (error as any)?.message || "Bilinmeyen hata";
-            alert(`Musteri satin alimlari yuklenemedi: ${message}`);
+            toast.error("Müşteri satın alımları yüklenemedi", { description: message });
             setPurchases([]);
         } finally {
             setLoadingPurchases(false);
@@ -109,15 +110,15 @@ export default function ReturnsPage() {
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.customer_id || !formData.purchase_key) {
-            alert("Lutfen musteri ve satin alinan urunu secin.");
+            toast.warning("Lütfen müşteri ve satın alınan ürünü seçin");
             return;
         }
         if (!selectedPurchase) {
-            alert("Gecerli bir satin alinan urun secin.");
+            toast.warning("Geçerli bir satın alınan ürün seçin");
             return;
         }
         if (Number(formData.quantity) > selectedPurchase.returnable_qty) {
-            alert(`Iade miktari en fazla ${selectedPurchase.returnable_qty} ${selectedPurchase.product_unit} olabilir.`);
+            toast.warning(`İade miktarı en fazla ${selectedPurchase.returnable_qty} ${selectedPurchase.product_unit} olabilir`);
             return;
         }
 
@@ -142,9 +143,9 @@ export default function ReturnsPage() {
                 unit_price: "0",
                 reason: "",
             });
-            alert("Iade kaydi olusturuldu. Stok geri eklendi.");
+            toast.success("İade kaydı oluşturuldu. Stok geri eklendi.");
         } catch (error: any) {
-            alert(`Iade olusturulamadi: ${error.response?.data?.error || error.message}`);
+            toast.error("İade oluşturulamadı", { description: error.response?.data?.error || error.message });
         } finally {
             setSaving(false);
         }

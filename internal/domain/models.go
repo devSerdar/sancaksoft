@@ -150,6 +150,15 @@ type CreatePaymentRequest struct {
 	PaymentDate   time.Time       `json:"payment_date"`
 }
 
+// UpdatePaymentRequest is the DTO for updating a payment
+type UpdatePaymentRequest struct {
+	Amount        decimal.Decimal `json:"amount"`
+	PaymentMethod PaymentMethod   `json:"payment_method"`
+	ReferenceNo   string          `json:"reference_no"`
+	Notes         string          `json:"notes"`
+	PaymentDate   time.Time       `json:"payment_date"`
+}
+
 // CustomerBalanceDetail represents detailed customer balance info
 type CustomerBalanceDetail struct {
 	CustomerID     uuid.UUID       `json:"customer_id"`

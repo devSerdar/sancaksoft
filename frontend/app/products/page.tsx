@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 import api from "@/services/api";
 import { Product, Warehouse, WarehouseStock } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,11 +93,12 @@ export default function ProductsPage() {
         e.preventDefault();
         try {
             await api.post("/products", formData);
+            toast.success("Ürün oluşturuldu");
             setShowForm(false);
             setFormData({ name: "", sku: "", unit: "adet", price: "", vat_rate: "18" });
             fetchProducts();
         } catch (error: any) {
-            alert(`Ürün oluşturulamadı: ${error.response?.data?.error || error.message}`);
+            toast.error("Ürün oluşturulamadı", { description: error.response?.data?.error || error.message });
         }
     };
 
@@ -113,10 +115,10 @@ export default function ProductsPage() {
             setShowStockForm(null);
             setStockData({ warehouse_id: "", quantity: "" });
             setStockMode("add");
-            alert(stockMode === "add" ? "Stok başarıyla eklendi!" : "Stok başarıyla düşürüldü!");
+            toast.success(stockMode === "add" ? "Stok başarıyla eklendi" : "Stok başarıyla düşürüldü");
             fetchProductStock(productId);
         } catch (error: any) {
-            alert(error.response?.data?.error || error.response?.data?.details || `Stok işlemi başarısız: ${error.message}`);
+            toast.error("Stok işlemi başarısız", { description: error.response?.data?.error || error.response?.data?.details || error.message });
         }
     };
 

@@ -75,3 +75,40 @@ func (s *PaymentService) GetCustomerBalance(ctx context.Context, tenantID, custo
 func (s *PaymentService) GetCustomerLedgerDetail(ctx context.Context, tenantID, customerID uuid.UUID) ([]domain.CustomerLedgerDetailEntry, error) {
 	return s.paymentRepo.GetCustomerLedgerDetail(ctx, tenantID, customerID)
 }
+
+// UpdatePayment updates an existing payment
+func (s *PaymentService) UpdatePayment(ctx context.Context, tenantID, paymentID uuid.UUID, req *domain.UpdatePaymentRequest) (*domain.CustomerPayment, error) {
+	if req.Amount.LessThanOrEqual(decimal.Zero) {
+		return nil, fmt.Errorf("payment amount must be greater than zero")
+	}
+	validMethods := map[domain.PaymentMethod]bool{
+		domain.PaymentMethodCash:         true,
+		domain.PaymentMethodBankTransfer: true,
+		domain.PaymentMethodCreditCard:   true,
+		domain.PaymentMethodCheck:        true,
+	}
+	if !validMethods[req.PaymentMethod] {
+		return nil, fmt.Errorf("invalid payment method: %s", req.PaymentMethod)
+	}
+	existing, err := s.paymentRepo.GetPaymentByID(ctx, tenantID, paymentID)
+	if err != nil {
+		return nil, fmt.Errorf("payment not found: %w", err)
+	}
+	existing.Amount = req.Amount
+	existing.PaymentMethod = req.PaymentMethod
+	existing.ReferenceNo = req.ReferenceNo
+	existing.Notes = req.Notes
+	existing.PaymentDate = req.PaymentDate
+	if err := s.paymentRepo.UpdatePayment(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+// DeletePayment removes a payment
+func (s *PaymentService) DeletePayment(ctx context.Context, tenantID, paymentID uuid.UUID) error {
+	if _, err := s.paymentRepo.GetPaymentByID(ctx, tenantID, paymentID); err != nil {
+		return fmt.Errorf("payment not found: %w", err)
+	}
+	return s.paymentRepo.DeletePayment(ctx, tenantID, paymentID)
+}

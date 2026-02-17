@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/Pagination";
@@ -71,7 +72,7 @@ export default function InvoicesPage() {
             const res = await api.get<InvoiceDetail>(`/invoices/${invoiceId}`);
             if (!closedRef.current) setDetail(res.data);
         } catch (error) {
-            if (!closedRef.current) alert("Fatura detayı yüklenemedi.");
+            if (!closedRef.current) toast.error("Fatura detayı yüklenemedi");
             console.error("Failed to fetch invoice detail", error);
         } finally {
             setLoadingDetail(false);

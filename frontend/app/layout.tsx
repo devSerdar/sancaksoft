@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
 
@@ -25,6 +26,16 @@ export default function RootLayout({
     <html lang="tr" className="h-full">
       <body className={`${inter.className} h-full antialiased`}>
         <AppShell>{children}</AppShell>
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          toastOptions={{
+            classNames: {
+              toast: "font-medium",
+            },
+          }}
+        />
       </body>
     </html>
   );

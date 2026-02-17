@@ -17,6 +17,15 @@ type CreatePaymentRequestDTO struct {
 	PaymentDate   *time.Time      `json:"payment_date"` // Optional, defaults to now
 }
 
+// UpdatePaymentRequestDTO is the API request for updating a payment
+type UpdatePaymentRequestDTO struct {
+	Amount        decimal.Decimal `json:"amount" validate:"required,gt=0"`
+	PaymentMethod string          `json:"payment_method" validate:"required"`
+	ReferenceNo   string          `json:"reference_no"`
+	Notes         string          `json:"notes"`
+	PaymentDate   *time.Time      `json:"payment_date"` // Optional
+}
+
 // PaymentResponseDTO is the API response for a payment
 type PaymentResponseDTO struct {
 	ID            uuid.UUID       `json:"id"`

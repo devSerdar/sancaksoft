@@ -37,6 +37,65 @@ func (r *PaymentRepository) CreatePayment(ctx context.Context, p *domain.Custome
 	).Scan(&p.CreatedAt)
 }
 
+// GetPaymentByID retrieves a single payment by ID (for update/delete validation)
+func (r *PaymentRepository) GetPaymentByID(ctx context.Context, tenantID, paymentID uuid.UUID) (*domain.CustomerPayment, error) {
+	query := `
+		SELECT id, tenant_id, customer_id, amount, payment_method, reference_no, notes, payment_date, created_at
+		FROM customer_payments
+		WHERE tenant_id = $1 AND id = $2
+	`
+	var p domain.CustomerPayment
+	var refNo, notes *string
+	err := r.db.QueryRow(ctx, query, tenantID, paymentID).Scan(
+		&p.ID, &p.TenantID, &p.CustomerID, &p.Amount, &p.PaymentMethod,
+		&refNo, &notes, &p.PaymentDate, &p.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if refNo != nil {
+		p.ReferenceNo = *refNo
+	}
+	if notes != nil {
+		p.Notes = *notes
+	}
+	return &p, nil
+}
+
+// UpdatePayment updates an existing payment
+func (r *PaymentRepository) UpdatePayment(ctx context.Context, p *domain.CustomerPayment) error {
+	query := `
+		UPDATE customer_payments
+		SET amount = $2, payment_method = $3, reference_no = $4, notes = $5, payment_date = $6
+		WHERE tenant_id = $1 AND id = $7
+	`
+	result, err := r.db.Exec(ctx, query,
+		p.TenantID, p.Amount, p.PaymentMethod, p.ReferenceNo, p.Notes, p.PaymentDate, p.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update payment: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("payment not found")
+	}
+	return nil
+}
+
+// DeletePayment removes a payment
+func (r *PaymentRepository) DeletePayment(ctx context.Context, tenantID, paymentID uuid.UUID) error {
+	result, err := r.db.Exec(ctx,
+		`DELETE FROM customer_payments WHERE tenant_id = $1 AND id = $2`,
+		tenantID, paymentID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete payment: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("payment not found")
+	}
+	return nil
+}
+
 // ListPaymentsByCustomer retrieves all payments for a customer
 func (r *PaymentRepository) ListPaymentsByCustomer(ctx context.Context, tenantID, customerID uuid.UUID) ([]domain.CustomerPayment, error) {
 	query := `
@@ -121,6 +180,8 @@ func (r *PaymentRepository) GetCustomerBalance(ctx context.Context, tenantID, cu
 }
 
 // GetCustomerLedgerDetail returns detailed ledger entries with running balance
+// Sıralama: sort_ts (sisteme girilme zamanı) kullanılır - aynı gün fatura/ödeme varsa
+// önce fatura, sonra ödeme görünsün (payment_date gece yarısı olunca ödeme faturadan önce geliyordu)
 func (r *PaymentRepository) GetCustomerLedgerDetail(ctx context.Context, tenantID, customerID uuid.UUID) ([]domain.CustomerLedgerDetailEntry, error) {
 	query := `
 		WITH all_movements AS (
@@ -128,6 +189,7 @@ func (r *PaymentRepository) GetCustomerLedgerDetail(ctx context.Context, tenantI
 			SELECT 
 				i.id,
 				i.created_at as date,
+				i.created_at as sort_ts,
 				'SALE' as type,
 				CONCAT('Fatura #', i.invoice_number) as description,
 				i.total_amount as debit,
@@ -143,6 +205,7 @@ func (r *PaymentRepository) GetCustomerLedgerDetail(ctx context.Context, tenantI
 			SELECT 
 				cr.id,
 				cr.created_at as date,
+				cr.created_at as sort_ts,
 				'RETURN' as type,
 				'Ürün İadesi' as description,
 				0::decimal as debit,
@@ -154,10 +217,11 @@ func (r *PaymentRepository) GetCustomerLedgerDetail(ctx context.Context, tenantI
 			
 			UNION ALL
 			
-			-- Ödemeler (Alacak)
+			-- Ödemeler (Alacak) - sort_ts = created_at (sisteme girilme) böylece faturadan sonra girilen ödeme doğru sırada
 			SELECT 
 				cp.id,
 				cp.payment_date as date,
+				cp.created_at as sort_ts,
 				'PAYMENT' as type,
 				COALESCE(cp.notes, 'Ödeme') as description,
 				0::decimal as debit,
@@ -170,7 +234,7 @@ func (r *PaymentRepository) GetCustomerLedgerDetail(ctx context.Context, tenantI
 		SELECT 
 			id, date, type, description, debit, credit, payment_method, reference_no
 		FROM all_movements
-		ORDER BY date ASC
+		ORDER BY sort_ts ASC
 	`
 
 	rows, err := r.db.Query(ctx, query, tenantID, customerID)

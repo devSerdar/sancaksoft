@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import api from "@/services/api";
 import { Warehouse } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,11 +34,12 @@ export default function WarehousesPage() {
         e.preventDefault();
         try {
             await api.post("/warehouses", formData);
+            toast.success("Depo oluşturuldu");
             setShowForm(false);
             setFormData({ name: "", location: "" });
             fetchWarehouses();
         } catch (error: any) {
-            alert(`Depo oluşturulamadı: ${error.response?.data?.error || error.message}`);
+            toast.error("Depo oluşturulamadı", { description: error.response?.data?.error || error.message });
         }
     };
 

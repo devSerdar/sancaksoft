@@ -84,6 +84,20 @@ func (h *ReturnHandler) ListCustomerReturns(c *fiber.Ctx) error {
 	return c.JSON(resp)
 }
 
+// DeleteReturn handles DELETE /returns/:id
+func (h *ReturnHandler) DeleteReturn(c *fiber.Ctx) error {
+	returnID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid return id"})
+	}
+	tenantID, _ := c.Locals(middleware.LocalsTenantID).(uuid.UUID)
+
+	if err := h.service.DeleteCustomerReturn(c.Context(), tenantID, returnID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 func (h *ReturnHandler) ListCustomerPurchases(c *fiber.Ctx) error {
 	tenantID, _ := c.Locals(middleware.LocalsTenantID).(uuid.UUID)
 	customerIDStr := c.Params("customerId")

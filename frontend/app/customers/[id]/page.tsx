@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomerLedgerDetail, LedgerDetailEntry, PaymentMethod, Product, Warehouse } from "@/types";
-import { ArrowLeft, Plus, Wallet, TrendingUp, TrendingDown, CreditCard, Banknote, Building2, FileCheck, ShoppingCart, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Wallet, TrendingUp, TrendingDown, CreditCard, Banknote, Building2, FileCheck, ShoppingCart, Trash2, Pencil } from "lucide-react";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 
@@ -33,7 +34,7 @@ interface InvoiceItem {
     total: number;
 }
 
-type FormMode = "none" | "payment" | "sale";
+type FormMode = "none" | "payment" | "sale" | "edit_payment";
 
 export default function CustomerDetailPage() {
     const params = useParams();
@@ -65,6 +66,8 @@ export default function CustomerDetailPage() {
     const [selectedProduct, setSelectedProduct] = useState("");
     const [itemQuantity, setItemQuantity] = useState("");
     const [itemPrice, setItemPrice] = useState("");
+    const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+    const [entryToDelete, setEntryToDelete] = useState<LedgerDetailEntry | null>(null);
 
     const fetchLedgerDetail = async () => {
         try {
@@ -72,7 +75,7 @@ export default function CustomerDetailPage() {
             setLedgerDetail(res.data);
         } catch (error: any) {
             console.error("Failed to fetch ledger detail", error);
-            alert(`Cari detay getirilemedi: ${error.response?.data?.error || error.message}`);
+            toast.error("Cari detay getirilemedi", { description: error.response?.data?.error || error.message });
         } finally {
             setLoading(false);
         }
@@ -101,25 +104,48 @@ export default function CustomerDetailPage() {
         }
     }, [customerId]);
 
+    const handleEditPayment = (entry: LedgerDetailEntry) => {
+        if (entry.type !== "PAYMENT") return;
+        setEditingPaymentId(entry.id);
+        setPaymentForm({
+            amount: String(entry.credit),
+            payment_method: (entry.payment_method as PaymentMethod) || "cash",
+            reference_no: entry.reference_no || "",
+            notes: entry.description !== "Ödeme" ? entry.description : "",
+            payment_date: new Date(entry.date).toISOString().split("T")[0],
+        });
+        setFormMode("edit_payment");
+    };
+
     const handlePaymentSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
-            alert("Lütfen geçerli bir tutar girin");
+            toast.warning("Lütfen geçerli bir tutar girin");
             return;
         }
 
         setSubmitting(true);
         try {
-            await api.post("/payments", {
-                customer_id: customerId,
+            const payload = {
                 amount: parseFloat(paymentForm.amount),
                 payment_method: paymentForm.payment_method,
                 reference_no: paymentForm.reference_no || undefined,
                 notes: paymentForm.notes || undefined,
                 payment_date: new Date(paymentForm.payment_date).toISOString(),
-            });
-
-            setFormMode("none");
+            };
+            if (editingPaymentId) {
+                await api.put(`/payments/${editingPaymentId}`, payload);
+                toast.success("Ödeme güncellendi");
+                setEditingPaymentId(null);
+                setFormMode("none");
+            } else {
+                await api.post("/payments", {
+                    customer_id: customerId,
+                    ...payload,
+                });
+                toast.success("Ödeme kaydedildi");
+                setFormMode("none");
+            }
             setPaymentForm({
                 amount: "",
                 payment_method: "cash",
@@ -129,7 +155,30 @@ export default function CustomerDetailPage() {
             });
             fetchLedgerDetail();
         } catch (error: any) {
-            alert(`Ödeme kaydedilemedi: ${error.response?.data?.error || error.message}`);
+            toast.error("Ödeme kaydedilemedi", { description: error.response?.data?.error || error.message });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDeleteEntry = async () => {
+        if (!entryToDelete) return;
+        setSubmitting(true);
+        try {
+            if (entryToDelete.type === "PAYMENT") {
+                await api.delete(`/payments/${entryToDelete.id}`);
+                toast.success("Ödeme silindi");
+            } else if (entryToDelete.type === "RETURN") {
+                await api.delete(`/returns/${entryToDelete.id}`);
+                toast.success("İade silindi");
+            } else if (entryToDelete.type === "SALE") {
+                await api.delete(`/invoices/${entryToDelete.id}`);
+                toast.success("Fatura silindi");
+            }
+            setEntryToDelete(null);
+            fetchLedgerDetail();
+        } catch (error: any) {
+            toast.error("Silme başarısız", { description: error.response?.data?.error || error.message });
         } finally {
             setSubmitting(false);
         }
@@ -138,7 +187,7 @@ export default function CustomerDetailPage() {
     // Add item to sale
     const handleAddItem = () => {
         if (!selectedProduct || !itemQuantity || !itemPrice) {
-            alert("Lütfen ürün, miktar ve fiyat girin");
+            toast.warning("Lütfen ürün, miktar ve fiyat girin");
             return;
         }
 
@@ -178,11 +227,11 @@ export default function CustomerDetailPage() {
     const handleSaleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!saleForm.warehouse_id) {
-            alert("Lütfen depo seçin");
+            toast.warning("Lütfen depo seçin");
             return;
         }
         if (saleForm.items.length === 0) {
-            alert("Lütfen en az bir ürün ekleyin");
+            toast.warning("Lütfen en az bir ürün ekleyin");
             return;
         }
 
@@ -199,6 +248,7 @@ export default function CustomerDetailPage() {
                 })),
             });
 
+            toast.success("Satış kaydedildi");
             setFormMode("none");
             setSaleForm({
                 warehouse_id: warehouses[0]?.id || "",
@@ -206,7 +256,7 @@ export default function CustomerDetailPage() {
             });
             fetchLedgerDetail();
         } catch (error: any) {
-            alert(`Satış kaydedilemedi: ${error.response?.data?.error || error.message}`);
+            toast.error("Satış kaydedilemedi", { description: error.response?.data?.error || error.message });
         } finally {
             setSubmitting(false);
         }
@@ -222,13 +272,6 @@ export default function CustomerDetailPage() {
     const formatBalance = (value: string | number) => {
         const num = Number(value);
         return `₺${Math.abs(num).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`;
-    };
-
-    // Bakiye durumunu açıkla
-    const getBalanceStatus = (value: number) => {
-        if (value > 0) return { text: "Borç", color: "text-red-600", bgColor: "bg-red-50" };
-        if (value < 0) return { text: "Alacak", color: "text-green-600", bgColor: "bg-green-50" };
-        return { text: "Sıfır", color: "text-gray-600", bgColor: "bg-gray-50" };
     };
 
     const formatDate = (dateStr: string) => {
@@ -277,7 +320,10 @@ export default function CustomerDetailPage() {
         );
     }
 
-    const balance = Number(ledgerDetail.current_balance);
+    // Kalan bakiye: hesap hareketlerindeki son satırın bakiyesi (güncel)
+    const balance = ledgerDetail.entries.length > 0
+        ? Number(ledgerDetail.entries[ledgerDetail.entries.length - 1].balance)
+        : Number(ledgerDetail.current_balance);
 
     return (
         <div className="p-4 sm:p-5 md:p-6 lg:p-8">
@@ -310,7 +356,7 @@ export default function CustomerDetailPage() {
                             <span>Yeni Satış</span>
                         </button>
                         <button
-                            onClick={() => setFormMode(formMode === "payment" ? "none" : "payment")}
+                            onClick={() => { setFormMode(formMode === "payment" ? "none" : "payment"); setEditingPaymentId(null); }}
                             className={`shrink-0 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-colors ${
                                 formMode === "payment"
                                     ? "bg-green-700 text-white"
@@ -359,17 +405,14 @@ export default function CustomerDetailPage() {
                         </div>
                     </CardContent>
                 </Card>
-                <Card className={`border-l-4 ${balance > 0 ? "border-l-red-500" : balance < 0 ? "border-l-blue-500" : "border-l-gray-400"}`}>
+                <Card className={`border-l-4 ${balance > 0 ? "border-l-red-500" : balance < 0 ? "border-l-green-500" : "border-l-gray-400"}`}>
                     <CardContent className="p-4">
                         <div className="flex items-center gap-2 text-gray-600 text-xs sm:text-sm mb-1">
                             <CreditCard className="h-4 w-4" />
                             Kalan Bakiye
                         </div>
-                        <div className={`text-lg sm:text-xl font-bold ${balance > 0 ? "text-red-600" : balance < 0 ? "text-blue-600" : "text-gray-600"}`}>
+                        <div className={`text-lg sm:text-xl font-bold ${balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : "text-gray-600"}`}>
                             {formatBalance(balance)}
-                        </div>
-                        <div className={`text-xs font-medium mt-0.5 ${balance > 0 ? "text-red-500" : balance < 0 ? "text-blue-500" : "text-gray-500"}`}>
-                            {balance > 0 ? "Müşteri size borçlu" : balance < 0 ? "Siz müşteriye borçlusunuz" : "Hesap kapalı"}
                         </div>
                     </CardContent>
                 </Card>
@@ -521,11 +564,13 @@ export default function CustomerDetailPage() {
                 </Card>
             )}
 
-            {/* Payment Form */}
-            {formMode === "payment" && (
+            {/* Payment Form (create or edit) */}
+            {(formMode === "payment" || formMode === "edit_payment") && (
                 <Card className="mb-6 shadow-md border-l-4 border-l-green-500">
                     <CardHeader className="p-4 sm:p-6">
-                        <CardTitle className="text-lg sm:text-xl font-semibold text-gray-800">Ödeme Kaydet</CardTitle>
+                        <CardTitle className="text-lg sm:text-xl font-semibold text-gray-800">
+                            {formMode === "edit_payment" ? "Ödemeyi Düzenle" : "Ödeme Kaydet"}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                         <form onSubmit={handlePaymentSubmit} className="space-y-4">
@@ -598,7 +643,7 @@ export default function CustomerDetailPage() {
                             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setFormMode("none")}
+                                    onClick={() => { setFormMode("none"); setEditingPaymentId(null); }}
                                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition"
                                 >
                                     İptal
@@ -608,7 +653,7 @@ export default function CustomerDetailPage() {
                                     disabled={submitting}
                                     className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow-sm transition disabled:opacity-50"
                                 >
-                                    {submitting ? "Kaydediliyor..." : "Ödemeyi Kaydet"}
+                                    {submitting ? "Kaydediliyor..." : formMode === "edit_payment" ? "Güncelle" : "Ödemeyi Kaydet"}
                                 </button>
                             </div>
                         </form>
@@ -650,19 +695,34 @@ export default function CustomerDetailPage() {
                                         <div className="flex justify-between items-center pt-2 border-t border-gray-100">
                                             <div className="space-x-3">
                                                 {Number(entry.debit) > 0 && (
-                                                    <span className="text-red-600 font-medium">Borç: {formatCurrency(entry.debit)}</span>
+                                                    <span className="text-red-600 font-medium">{formatCurrency(entry.debit)}</span>
                                                 )}
                                                 {Number(entry.credit) > 0 && (
-                                                    <span className="text-green-600 font-medium">Alacak: {formatCurrency(entry.credit)}</span>
+                                                    <span className="text-green-600 font-medium">{formatCurrency(entry.credit)}</span>
                                                 )}
                                             </div>
-                                            <div className="text-right">
-                                                <span className={`font-semibold ${Number(entry.balance) > 0 ? "text-red-600" : Number(entry.balance) < 0 ? "text-blue-600" : "text-gray-600"}`}>
+                                            <div className="flex items-center gap-2">
+                                                {entry.type === "PAYMENT" && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleEditPayment(entry)}
+                                                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                                                        title="Düzenle"
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEntryToDelete(entry)}
+                                                    className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition"
+                                                    title="Sil"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                                <span className={`font-semibold tabular-nums ${Number(entry.balance) > 0 ? "text-red-600" : Number(entry.balance) < 0 ? "text-green-600" : "text-gray-600"}`}>
                                                     {formatBalance(entry.balance)}
                                                 </span>
-                                                <div className={`text-xs ${Number(entry.balance) > 0 ? "text-red-500" : Number(entry.balance) < 0 ? "text-blue-500" : "text-gray-500"}`}>
-                                                    {Number(entry.balance) > 0 ? "Borç" : Number(entry.balance) < 0 ? "Alacak" : "Kapalı"}
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -678,14 +738,13 @@ export default function CustomerDetailPage() {
                                             <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">Tür</th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">Açıklama</th>
                                             <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
-                                                <span className="text-red-600">Borç (+)</span>
-                                                <div className="text-[10px] font-normal normal-case text-gray-400">Satışlar</div>
+                                                <span className="text-red-600">Satış</span>
                                             </th>
                                             <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
-                                                <span className="text-green-600">Alacak (-)</span>
-                                                <div className="text-[10px] font-normal normal-case text-gray-400">Ödemeler/İadeler</div>
+                                                <span className="text-green-600">Alacak</span>
                                             </th>
                                             <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase">Bakiye</th>
+                                            <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase w-24">İşlem</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -724,11 +783,30 @@ export default function CustomerDetailPage() {
                                                     )}
                                                 </td>
                                                 <td className="py-3.5 px-4 text-right">
-                                                    <div className={`font-semibold tabular-nums ${Number(entry.balance) > 0 ? "text-red-600" : Number(entry.balance) < 0 ? "text-blue-600" : "text-gray-600"}`}>
+                                                    <span className={`font-semibold tabular-nums ${Number(entry.balance) > 0 ? "text-red-600" : Number(entry.balance) < 0 ? "text-green-600" : "text-gray-600"}`}>
                                                         {formatBalance(entry.balance)}
-                                                    </div>
-                                                    <div className={`text-xs ${Number(entry.balance) > 0 ? "text-red-500" : Number(entry.balance) < 0 ? "text-blue-500" : "text-gray-500"}`}>
-                                                        {Number(entry.balance) > 0 ? "Borç" : Number(entry.balance) < 0 ? "Alacak" : "Kapalı"}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 px-4 text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {entry.type === "PAYMENT" && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleEditPayment(entry)}
+                                                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                                                                title="Düzenle"
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEntryToDelete(entry)}
+                                                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition"
+                                                            title="Sil"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -736,6 +814,41 @@ export default function CustomerDetailPage() {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Delete Confirmation Dialog */}
+                            {entryToDelete && (
+                                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setEntryToDelete(null)}>
+                                    <div
+                                        className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Hareketi Sil</h3>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            {entryToDelete.type === "SALE" && `${entryToDelete.description} silinecek. Stok otomatik iade edilecektir.`}
+                                            {entryToDelete.type === "RETURN" && `Bu iade silinecek. Stok düşülecektir.`}
+                                            {entryToDelete.type === "PAYMENT" && "Bu ödeme silinecek."}
+                                            {" Devam etmek istiyor musunuz?"}
+                                        </p>
+                                        <div className="flex gap-2 justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEntryToDelete(null)}
+                                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                                            >
+                                                İptal
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleDeleteEntry}
+                                                disabled={submitting}
+                                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50"
+                                            >
+                                                {submitting ? "Siliniyor..." : "Sil"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
                 </CardContent>
